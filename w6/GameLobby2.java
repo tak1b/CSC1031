@@ -1,190 +1,265 @@
 import java.util.ArrayList;
 import java.util.List;
+import java.util.*;
 
-// Player interface with required methods and a getter for name.
-interface Player {
+interface Player
+{
     void joinGame();
+
     void leaveGame();
+
     void sendMessage(String message);
+
     void receiveMessage(String message);
+
     String getPlayerType();
+
     String getName();
+
 }
 
-// AbstractPlayer providing common behavior for all players.
-abstract class AbstractPlayer implements Player {
+abstract class AbstractPlayer implements Player
+{
     protected String name;
     protected GameLobby lobby;
-    
-    public AbstractPlayer(String name, GameLobby lobby) {
+
+    public AbstractPlayer(String name, GameLobby lobby)
+    {
         this.name = name;
         this.lobby = lobby;
     }
-    
+
     @Override
-    public String getName() {
-        return name;
+    public String getName()
+    {
+        return this.name;
     }
-    
+
     @Override
-    public void joinGame() {
-        lobby.registerPlayer(this);
+    public void sendMessage(String message)
+    {
+        this.lobby.sendMessage(message, this);
     }
-    
+
     @Override
-    public void leaveGame() {
-        lobby.removePlayer(this);
+    public void receiveMessage(String message)
+    {
+        System.out.printf("[%s] received: \"%s\"\n", this.name, message);
     }
-    
-    @Override
-    public void sendMessage(String message) {
-        System.out.println("[" + name + "] sends: \"" + message + "\"");
-        lobby.sendMessage(message, this);
-    }
-    
-    @Override
-    public void receiveMessage(String message) {
-        System.out.println("[" + name + "] received: \"" + message + "\"");
-    }
-    
-    @Override
+
     public abstract String getPlayerType();
 }
 
-// Concrete player: HumanPlayer.
-class HumanPlayer extends AbstractPlayer {
-    public HumanPlayer(String name, GameLobby lobby) {
+class HumanPlayer extends AbstractPlayer
+{
+    public HumanPlayer(String name, GameLobby lobby)
+    {
         super(name, lobby);
     }
-    
     @Override
-    public String getPlayerType() {
+    public void joinGame()
+    {
+        lobby.registerPlayer(this);
+    }
+
+    @Override
+    public void leaveGame()
+    {
+        lobby.removePlayer(this);
+    }
+
+    @Override
+    public String getPlayerType()
+    {
         return "HumanPlayer";
     }
 }
 
-// Concrete player: AIPlayer.
-class AIPlayer extends AbstractPlayer {
-    public AIPlayer(String name, GameLobby lobby) {
+class AIPlayer extends AbstractPlayer
+{
+    public AIPlayer(String name, GameLobby lobby)
+    {
         super(name, lobby);
     }
-    
+
     @Override
-    public String getPlayerType() {
+    public void joinGame()
+    {
+        lobby.registerPlayer(this);
+    }
+
+    @Override
+    public void leaveGame()
+    {
+        lobby.removePlayer(this);
+    }
+
+    @Override
+    public String getPlayerType()
+    {
         return "AIPlayer";
     }
 }
 
-// Concrete player: Spectator.
-// Spectators are allowed to join/leave and receive messages, but cannot send messages.
-class Spectator extends AbstractPlayer {
-    public Spectator(String name, GameLobby lobby) {
+class Spectator extends AbstractPlayer
+{
+   public Spectator(String name, GameLobby lobby)
+    {
         super(name, lobby);
     }
-    
     @Override
-    public void sendMessage(String message) {
-        System.out.println("[GameLobby] Spectators cannot send messages.");
+    public void joinGame()
+    {
+        lobby.registerPlayer(this);
     }
-    
+
     @Override
-    public String getPlayerType() {
+    public void leaveGame()
+    {
+        lobby.removePlayer(this);
+    }
+
+
+    public String getPlayerType()
+    {
         return "Spectator";
     }
 }
 
-// New Concrete player: AdminPlayer.
-// Admin players can kick other players from the lobby.
-class AdminPlayer extends AbstractPlayer {
+class PlayerFactory
+{
+    public static Player createPlayer(String type, String name, GameLobby lobby)
+    {
+        switch (type.toLowerCase())
+        {
+            case "human":
+                return new HumanPlayer(name, lobby);
+            case "ai":
+                return new AIPlayer(name, lobby);
+            case "spectator":
+                return new Spectator(name, lobby);
+            case "admin":
+                return new AdminPlayer(name, lobby);
+            default:
+                throw new IllegalArgumentException("Invalid player type: " + type);
+        }
+    }
+}
+
+class AdminPlayer extends AbstractPlayer
+{
     public AdminPlayer(String name, GameLobby lobby) {
         super(name, lobby);
     }
-    
+
     @Override
     public String getPlayerType() {
         return "AdminPlayer";
     }
-    
-    // Kick a player by name using the mediator.
-    public void kickPlayer(String targetName) {
-        lobby.kickPlayer(targetName, this);
+
+    public void kickPlayer(String name) {
+        lobby.kickPlayer(name, this);
     }
+
+    @Override
+    public void joinGame()
+    {
+        lobby.registerPlayer(this);
+    }
+
+    @Override
+    public void leaveGame()
+    {
+        lobby.removePlayer(this);
+    }
+
 }
 
-// Mediator: GameLobby manages all players, messages, game start and kick functionality.
-class GameLobby {
-    private List<Player> players;
-    
-    public GameLobby() {
-        players = new ArrayList<>();
-    }
-    
-    // Registers a player and outputs the join message.
-    public void registerPlayer(Player player) {
+class GameLobby
+{
+    LinkedHashSet<Player> players = new LinkedHashSet<>();
+
+    void registerPlayer(Player player)
+    {
         players.add(player);
-        System.out.println("[GameLobby] " + player.getPlayerType() + " " + player.getName() + " has joined the lobby.");
+        System.out.printf("[GameLobby] %s %s has joined the lobby.\n", player.getPlayerType(), ((AbstractPlayer)player).name);
     }
-    
-    // Removes a player and outputs the leave message.
-    public void removePlayer(Player player) {
+
+    void removePlayer(Player player)
+    {
         players.remove(player);
-        System.out.println("[GameLobby] " + player.getPlayerType() + " " + player.getName() + " has left the lobby.");
+        System.out.printf("[GameLobby] %s %s has left the lobby.\n", player.getPlayerType(), ((AbstractPlayer)player).name);
     }
-    
-    // Sends a message from the sender to all other players.
-    public void sendMessage(String message, Player sender) {
-        // Protect against accidental message sending from Spectators.
-        if (sender.getPlayerType().equals("Spectator")) {
-            System.out.println("[GameLobby] Spectators cannot send messages.");
-            return;
-        }
-        System.out.println("[GameLobby] Message from " + sender.getName() + ": \"" + message + "\"");
-        for (Player p : players) {
-            if (p != sender) {
-                p.receiveMessage(message);
-            }
-        }
-    }
-    
-    // Starts the match if there are at least two eligible players (Human or AI).
-    public void startMatch() {
-        List<String> eligiblePlayers = new ArrayList<>();
-        for (Player p : players) {
-            String type = p.getPlayerType();
-            if (type.equals("HumanPlayer") || type.equals("AIPlayer")) {
-                eligiblePlayers.add(p.getName());
-            }
-        }
-        
-        if (eligiblePlayers.size() < 2) {
-            System.out.println("[GameLobby] Not enough players to start a match.");
-        } else {
-            String playersList = String.join(", ", eligiblePlayers);
-            System.out.println("[GameLobby] Starting game with players: " + playersList);
-        }
-    }
-    
-    // Kick a player by name. Only an AdminPlayer can kick, and they cannot kick themselves.
-    public void kickPlayer(String targetName, AdminPlayer admin) {
-        if (admin.getName().equals(targetName)) {
-            System.out.println("[GameLobby] Admins cannot kick themselves.");
-            return;
-        }
-        
-        Player target = null;
-        for (Player p : players) {
-            if (p.getName().equals(targetName)) {
-                target = p;
+
+    void kickPlayer(String name, AdminPlayer admin)
+    {
+        Player playerToKick = null;
+
+        for(Player p : players)
+        {
+            if (((AbstractPlayer)p).name.equals(name))
+            {
+                playerToKick = p;
                 break;
             }
         }
-        
-        if (target != null) {
-            System.out.println("[GameLobby] Admin " + admin.getName() 
-                    + " kicked " + target.getPlayerType() + " " + target.getName() + " from the lobby.");
-            removePlayer(target);
-        } else {
-            System.out.println("[GameLobby] Player " + targetName + " not found.");
+
+        if (playerToKick != null && playerToKick.getPlayerType() != "AdminPlayer")
+        {
+            players.remove(playerToKick);
+            System.out.printf("[GameLobby] Admin %s kicked %s %s from the lobby.\n", admin.name, playerToKick.getPlayerType(), ((AbstractPlayer)playerToKick).name);
+            System.out.printf("[GameLobby] %s %s has left the lobby.\n", playerToKick.getPlayerType(), ((AbstractPlayer)playerToKick).name);
+    }
+        else
+        {
+            System.out.printf("[GameLobby] Player %s not found.\n", name);
+        }
+
+    }
+
+    void sendMessage(String message, Player player)
+    {
+        if (player.getPlayerType() == "Spectator")
+        {
+            System.out.printf("[GameLobby] Spectators cannot send messages.\n");
+        }
+        else
+        {
+            System.out.printf("[%s] sends: \"%s\"\n", ((AbstractPlayer)player).name, message);
+            System.out.printf("[GameLobby] Message from %s: \"%s\"\n", ((AbstractPlayer)player).name, message);
+            for (Player p : players)
+            {
+                if (((AbstractPlayer)player).name != ((AbstractPlayer)p).name)
+                {
+                    p.receiveMessage(message);
+                }
+            }
+        }
+    }
+
+    void startMatch()
+    {
+        int count = 0;
+        String output = "";
+        for (Player p : players)
+        {
+            if (p.getPlayerType() != "Spectator")
+            {
+                if (p.getPlayerType() != "AdminPlayer")
+                {
+                    count += 1;
+                    output += ", " + ((AbstractPlayer)p).name;
+                }
+            }
+        }
+
+        if (count < 2)
+        {
+            System.out.printf("[GameLobby] Not enough players to start a match.\n");
+        }
+        else
+        {
+            System.out.printf("[GameLobby] Starting game with players: %s\n", output.substring(2));
         }
     }
 }
